@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Campus Companion</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Source+Sans+3:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="authScreen" class="auth-screen">
+      <section class="auth-card">
+        <div class="auth-copy">
+          <p class="eyebrow">B.Tech 2nd Semester</p>
+          <h1>Campus Companion</h1>
+          <p>
+            One secure place for your timetable, class notes, tech learning, and daily files.
+          </p>
+          <div class="feature-list">
+            <span>Account login</span>
+            <span>SQLite data storage</span>
+            <span>Daily file uploads</span>
+            <span>Access from another device</span>
+          </div>
+        </div>
+
+        <div class="auth-panel">
+          <div class="auth-tabs">
+            <button id="showLoginBtn" class="tab-btn active" type="button">Login</button>
+            <button id="showRegisterBtn" class="tab-btn" type="button">Create Account</button>
+          </div>
+
+          <form id="loginForm" class="stack-form">
+            <input id="loginEmail" type="email" placeholder="Email address" required />
+            <input id="loginPassword" type="password" placeholder="Password" required />
+            <button type="submit">Login</button>
+          </form>
+
+          <form id="registerForm" class="stack-form hidden">
+            <input id="registerName" type="text" placeholder="Your full name" required />
+            <input id="registerEmail" type="email" placeholder="Email address" required />
+            <input id="registerPassword" type="password" placeholder="Create password" required />
+            <button type="submit">Create Account</button>
+          </form>
+
+          <p id="authMessage" class="auth-message"></p>
+        </div>
+      </section>
+    </div>
+
+    <div id="appShell" class="app-shell hidden">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <p class="eyebrow">Account Storage</p>
+          <h1>Campus Companion</h1>
+          <p class="brand-copy">
+            Your data is now saved on the server, not only inside one browser.
+          </p>
+        </div>
+
+        <form id="profileForm" class="profile-card">
+          <div class="profile-heading">
+            <div>
+              <h2>Student Snapshot</h2>
+              <p id="loggedInAs" class="brand-copy"></p>
+            </div>
+            <button id="logoutBtn" class="ghost-btn" type="button">Logout</button>
+          </div>
+          <div class="profile-grid">
+            <label>
+              Name
+              <input id="studentName" type="text" placeholder="Your name" />
+            </label>
+            <label>
+              College
+              <input id="collegeName" type="text" placeholder="Your college name" />
+            </label>
+            <label>
+              Branch
+              <input id="branchName" type="text" placeholder="CSE / ECE / IT" />
+            </label>
+            <label>
+              Semester
+              <input id="semesterName" type="text" value="2nd Semester" />
+            </label>
+            <label>
+              Section
+              <input id="sectionName" type="text" placeholder="A / B / C" />
+            </label>
+            <label>
+              Goals
+              <input id="goalName" type="text" placeholder="Placement, coding, GPA..." />
+            </label>
+          </div>
+          <button type="submit">Save Profile</button>
+        </form>
+
+        <div class="action-card">
+          <h2>Storage</h2>
+          <p>
+            Your records are stored in SQLite and uploaded files are saved on the server.
+          </p>
+          <button id="exportBtn" class="secondary-btn" type="button">Export My Data</button>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <section class="hero-card">
+          <div>
+            <p class="eyebrow">Study System</p>
+            <h2>Track classes, concepts, projects, and daily work from one login.</h2>
+          </div>
+          <div class="hero-stats">
+            <div>
+              <span id="subjectCount">0</span>
+              <p>Subjects</p>
+            </div>
+            <div>
+              <span id="noteCount">0</span>
+              <p>Notes</p>
+            </div>
+            <div>
+              <span id="fileCount">0</span>
+              <p>Saved Files</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h3>Weekly Timetable</h3>
+            <p>Add your college schedule subject by subject.</p>
+          </div>
+          <form id="timetableForm" class="inline-form">
+            <label>
+              Day
+              <select id="scheduleDay">
+                <option>Monday</option>
+                <option>Tuesday</option>
+                <option>Wednesday</option>
+                <option>Thursday</option>
+                <option>Friday</option>
+                <option>Saturday</option>
+              </select>
+            </label>
+            <label>
+              Start Time
+              <input id="scheduleStartTime" type="time" required />
+            </label>
+            <label>
+              End Time
+              <input id="scheduleEndTime" type="time" required />
+            </label>
+            <label>
+              Subject
+              <input id="scheduleSubject" type="text" placeholder="Mathematics" required />
+            </label>
+            <label>
+              Room / Faculty
+              <input id="scheduleRoom" type="text" placeholder="Room 203 / Mr. Rao" />
+            </label>
+            <button type="submit">Add Class</button>
+          </form>
+          <div id="timetableList" class="card-grid"></div>
+        </section>
+
+        <section class="panel two-column">
+          <div class="sub-panel">
+            <div class="panel-heading">
+              <h3>Class Notes</h3>
+              <p>Write what was taught in class.</p>
+            </div>
+            <form id="classNoteForm" class="stack-form">
+              <input id="classTitle" type="text" placeholder="Topic title" required />
+              <input id="classSubject" type="text" placeholder="Subject name" required />
+              <input id="classDate" type="date" required />
+              <textarea
+                id="classContent"
+                rows="5"
+                placeholder="Write today's lecture summary, formulas, examples, and homework..."
+                required
+              ></textarea>
+              <button type="submit">Save Class Note</button>
+            </form>
+            <div id="classNotesList" class="note-list"></div>
+          </div>
+
+          <div class="sub-panel">
+            <div class="panel-heading">
+              <h3>Tech Learning</h3>
+              <p>Capture new things you learn outside class.</p>
+            </div>
+            <form id="techNoteForm" class="stack-form">
+              <input id="techTitle" type="text" placeholder="Topic or tool" required />
+              <input id="techTag" type="text" placeholder="Tag: Web, AI, Java, DSA..." />
+              <input id="techDate" type="date" required />
+              <textarea
+                id="techContent"
+                rows="5"
+                placeholder="Write what you learned, useful links, commands, or project ideas..."
+                required
+              ></textarea>
+              <button type="submit">Save Tech Note</button>
+            </form>
+            <div id="techNotesList" class="note-list"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h3>Daily Work Vault</h3>
+            <p>Store your daily tasks, progress, and important work files.</p>
+          </div>
+          <form id="dailyWorkForm" class="stack-form">
+            <div class="triple-grid">
+              <input id="workDate" type="date" required />
+              <input id="workTitle" type="text" placeholder="Day summary" required />
+              <input id="workFocus" type="text" placeholder="Main focus: lab / assignment / coding" />
+            </div>
+            <textarea
+              id="workSummary"
+              rows="4"
+              placeholder="What did you complete today? What is pending? What should you revise later?"
+              required
+            ></textarea>
+            <label class="file-picker">
+              <span>Add work files</span>
+              <input id="workFiles" type="file" multiple />
+            </label>
+            <button type="submit">Save Daily Record</button>
+          </form>
+          <div id="dailyWorkList" class="note-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
