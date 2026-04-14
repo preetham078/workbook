@@ -1,6 +1,7 @@
 import cgi
 import hashlib
 import json
+import os
 import secrets
 import shutil
 import sqlite3
@@ -11,11 +12,11 @@ from urllib.parse import urlparse
 
 
 BASE_DIR = Path(__file__).resolve().parent
-STORAGE_DIR = BASE_DIR / "storage"
+STORAGE_DIR = Path(os.environ.get("STORAGE_DIR", BASE_DIR / "storage")).resolve()
 UPLOAD_DIR = STORAGE_DIR / "uploads"
 DB_PATH = STORAGE_DIR / "campus_companion.db"
 HOST = "0.0.0.0"
-PORT = 8000
+PORT = int(os.environ.get("PORT", "8000"))
 
 
 def now_iso():

@@ -27,3 +27,15 @@ Then open:
 
 - `http://localhost:8000` on the same machine
 - `http://YOUR-COMPUTER-IP:8000` from another device on the same Wi-Fi
+
+## Deploy on Render
+
+1. Push this repo to GitHub.
+2. Create a new Blueprint service on Render from this repository.
+3. In Render, add a persistent disk and mount it at `/var/data`.
+4. Deploy the service.
+
+The app is already configured to use:
+
+- `PORT` from Render automatically
+- `STORAGE_DIR=/var/data` for the SQLite database and uploaded files
