@@ -1,12 +1,21 @@
-export const firebaseConfig = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME",
-  projectId: "REPLACE_ME",
-  storageBucket: "REPLACE_ME",
-  messagingSenderId: "REPLACE_ME",
-  appId: "REPLACE_ME",
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBVrm9zr6bS8DP5dIw67ItMdYuFgMRGj0w",
+  authDomain: "workbook-abb8e.firebaseapp.com",
+  projectId: "workbook-abb8e",
+  storageBucket: "workbook-abb8e.firebasestorage.app",
+  messagingSenderId: "462434137551",
+  appId: "1:462434137551:web:ef6b2906a1b429ce634eba",
+  measurementId: "G-NDK9E6M53C"
 };
 
-export function isFirebaseConfigured(config) {
-  return Object.values(config).every((value) => value && value !== "REPLACE_ME");
-}
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
