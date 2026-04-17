@@ -13,19 +13,25 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <div id="setupNotice" class="setup-notice hidden">
+      <strong>Firebase setup needed.</strong>
+      Update <code>firebase-config.js</code>, enable Email/Password Auth, create Firestore,
+      then refresh this page.
+    </div>
+
     <div id="authScreen" class="auth-screen">
       <section class="auth-card">
         <div class="auth-copy">
           <p class="eyebrow">B.Tech 2nd Semester</p>
           <h1>Campus Companion</h1>
           <p>
-            One secure place for your timetable, class notes, tech learning, and daily files.
+            One cloud-synced place for your timetable, class notes, tech learning, and daily work tracking.
           </p>
           <div class="feature-list">
-            <span>Account login</span>
-            <span>SQLite data storage</span>
-            <span>Daily file uploads</span>
-            <span>Access from another device</span>
+            <span>GitHub Pages frontend</span>
+            <span>Firebase login</span>
+            <span>Firestore sync</span>
+            <span>Daily work tracking</span>
           </div>
         </div>
 
@@ -56,10 +62,10 @@
     <div id="appShell" class="app-shell hidden">
       <aside class="sidebar">
         <div class="brand-block">
-          <p class="eyebrow">Account Storage</p>
+          <p class="eyebrow">Firebase Sync</p>
           <h1>Campus Companion</h1>
           <p class="brand-copy">
-            Your data is now saved on the server, not only inside one browser.
+            Your records are stored in Firestore.
           </p>
         </div>
 
@@ -101,10 +107,8 @@
         </form>
 
         <div class="action-card">
-          <h2>Storage</h2>
-          <p>
-            Your records are stored in SQLite and uploaded files are saved on the server.
-          </p>
+          <h2>Backup</h2>
+          <p>Export a JSON snapshot of your current cloud data.</p>
           <button id="exportBtn" class="secondary-btn" type="button">Export My Data</button>
         </div>
       </aside>
@@ -214,7 +218,7 @@
         <section class="panel">
           <div class="panel-heading">
             <h3>Daily Work Vault</h3>
-            <p>Store your daily tasks, progress, and important work files.</p>
+            <p>Store your daily tasks, progress, and notes.</p>
           </div>
           <form id="dailyWorkForm" class="stack-form">
             <div class="triple-grid">
@@ -228,10 +232,6 @@
               placeholder="What did you complete today? What is pending? What should you revise later?"
               required
             ></textarea>
-            <label class="file-picker">
-              <span>Add work files</span>
-              <input id="workFiles" type="file" multiple />
-            </label>
             <button type="submit">Save Daily Record</button>
           </form>
           <div id="dailyWorkList" class="note-list"></div>
@@ -239,6 +239,6 @@
       </main>
     </div>
 
-    <script src="./app.js"></script>
+    <script type="module" src="./app.js"></script>
   </body>
 </html>

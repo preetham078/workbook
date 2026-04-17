@@ -56,6 +56,16 @@ textarea:focus {
   border-color: var(--accent);
 }
 
+.setup-notice {
+  margin: 18px auto 0;
+  width: min(1200px, calc(100% - 28px));
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(166, 63, 33, 0.18);
+  background: rgba(255, 243, 230, 0.92);
+  color: var(--accent-deep);
+}
+
 .auth-screen {
   min-height: 100vh;
   display: grid;
@@ -135,6 +145,7 @@ textarea:focus {
   color: var(--accent-deep);
   font-size: 0.88rem;
   font-weight: 700;
+  text-decoration: none;
 }
 
 .auth-tabs {
@@ -351,10 +362,6 @@ label {
 
 .entry-actions {
   justify-content: flex-end;
-}
-
-.file-pill {
-  border: none;
 }
 
 .file-picker {

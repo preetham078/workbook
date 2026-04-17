@@ -1,5 +1,24 @@
-const API_BASE = "/api";
-const TOKEN_KEY = "campus-companion-auth-token";
+import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+import {
+  createUserWithEmailAndPassword,
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getFirestore,
+  onSnapshot,
+  orderBy,
+  query,
+  setDoc,
+} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
 const defaultState = {
   user: null,
@@ -17,10 +36,14 @@ const defaultState = {
   dailyWork: [],
 };
 
-let authToken = localStorage.getItem(TOKEN_KEY) || "";
+let app;
+let auth;
+let db;
 let state = structuredClone(defaultState);
+let unsubscribers = [];
 
 const elements = {
+  setupNotice: document.querySelector("#setupNotice"),
   authScreen: document.querySelector("#authScreen"),
   appShell: document.querySelector("#appShell"),
   showLoginBtn: document.querySelector("#showLoginBtn"),
@@ -63,17 +86,35 @@ async function initialize() {
   bindAuthControls();
   bindAppControls();
 
-  if (authToken) {
-    try {
-      await loadBootstrap();
-      showApp();
-      return;
-    } catch {
-      clearAuth();
-    }
+  if (!isFirebaseConfigured(firebaseConfig)) {
+    elements.setupNotice.classList.remove("hidden");
+    setAuthMessage("Update firebase-config.js before using the app.");
+    return;
   }
 
-  showAuth();
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+
+  onAuthStateChanged(auth, async (user) => {
+    cleanupSubscriptions();
+
+    if (!user) {
+      state = structuredClone(defaultState);
+      showAuth();
+      return;
+    }
+
+    state.user = {
+      uid: user.uid,
+      email: user.email || "",
+      name: user.displayName || "",
+    };
+
+    await ensureUserDocument(user);
+    subscribeToUserData(user.uid);
+    showApp();
+  });
 }
 
 function bindAuthControls() {
@@ -85,21 +126,15 @@ function bindAuthControls() {
     setAuthMessage("Logging in...");
 
     try {
-      const response = await apiRequest("/login", {
-        method: "POST",
-        body: {
-          email: document.querySelector("#loginEmail").value.trim(),
-          password: document.querySelector("#loginPassword").value,
-        },
-      });
-
-      setAuth(response.token);
-      await loadBootstrap();
+      await signInWithEmailAndPassword(
+        auth,
+        document.querySelector("#loginEmail").value.trim(),
+        document.querySelector("#loginPassword").value,
+      );
       elements.loginForm.reset();
       setAuthMessage("");
-      showApp();
     } catch (error) {
-      setAuthMessage(error.message);
+      setAuthMessage(readableError(error));
     }
   });
 
@@ -107,62 +142,52 @@ function bindAuthControls() {
     event.preventDefault();
     setAuthMessage("Creating account...");
 
-    try {
-      const response = await apiRequest("/register", {
-        method: "POST",
-        body: {
-          name: document.querySelector("#registerName").value.trim(),
-          email: document.querySelector("#registerEmail").value.trim(),
-          password: document.querySelector("#registerPassword").value,
-        },
-      });
+    const name = document.querySelector("#registerName").value.trim();
+    const email = document.querySelector("#registerEmail").value.trim();
+    const password = document.querySelector("#registerPassword").value;
 
-      setAuth(response.token);
-      await loadBootstrap();
+    try {
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      await ensureUserDocument(credential.user, name);
       elements.registerForm.reset();
       setAuthMessage("");
-      showApp();
     } catch (error) {
-      setAuthMessage(error.message);
+      setAuthMessage(readableError(error));
     }
   });
 }
 
 function bindAppControls() {
   elements.logoutBtn.addEventListener("click", async () => {
-    try {
-      await apiRequest("/logout", { method: "POST" });
-    } catch {
-      // Ignore logout network errors and still clear the local token.
-    }
-    clearAuth();
-    showAuth();
+    await signOut(auth);
   });
 
   elements.profileForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const userDocRef = doc(db, "users", state.user.uid);
     const profile = {
       studentName: elements.studentName.value.trim(),
       collegeName: elements.collegeName.value.trim(),
       branchName: elements.branchName.value.trim(),
-      semesterName: elements.semesterName.value.trim(),
+      semesterName: elements.semesterName.value.trim() || "2nd Semester",
       sectionName: elements.sectionName.value.trim(),
       goalName: elements.goalName.value.trim(),
     };
 
-    await apiRequest("/profile", {
-      method: "PUT",
-      body: profile,
-    });
-
-    state.profile = profile;
-    renderProfile();
-    alert("Profile saved.");
+    await setDoc(
+      userDocRef,
+      {
+        ...profile,
+        email: state.user.email,
+        name: profile.studentName || state.user.name || "",
+        updatedAtMs: Date.now(),
+      },
+      { merge: true },
+    );
   });
 
   elements.exportBtn.addEventListener("click", () => {
-    const snapshot = JSON.stringify(state, null, 2);
-    const blob = new Blob([snapshot], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -173,81 +198,123 @@ function bindAppControls() {
 
   elements.timetableForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-
-    const created = await apiRequest("/timetable", {
-      method: "POST",
-      body: {
-        day: elements.scheduleDay.value,
-        startTime: elements.scheduleStartTime.value,
-        endTime: elements.scheduleEndTime.value,
-        subject: elements.scheduleSubject.value.trim(),
-        room: elements.scheduleRoom.value.trim(),
-      },
+    await addDoc(collection(db, "users", state.user.uid, "timetable"), {
+      day: elements.scheduleDay.value,
+      startTime: elements.scheduleStartTime.value,
+      endTime: elements.scheduleEndTime.value,
+      subject: elements.scheduleSubject.value.trim(),
+      room: elements.scheduleRoom.value.trim(),
+      createdAtMs: Date.now(),
     });
-
-    state.timetable.unshift(created.entry);
     elements.timetableForm.reset();
-    renderAll();
   });
 
   elements.classNoteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-
-    const created = await apiRequest("/class-notes", {
-      method: "POST",
-      body: {
-        title: document.querySelector("#classTitle").value.trim(),
-        subject: document.querySelector("#classSubject").value.trim(),
-        date: document.querySelector("#classDate").value,
-        content: document.querySelector("#classContent").value.trim(),
-      },
+    await addDoc(collection(db, "users", state.user.uid, "classNotes"), {
+      title: document.querySelector("#classTitle").value.trim(),
+      subject: document.querySelector("#classSubject").value.trim(),
+      date: document.querySelector("#classDate").value,
+      content: document.querySelector("#classContent").value.trim(),
+      createdAtMs: Date.now(),
     });
-
-    state.classNotes.unshift(created.entry);
     elements.classNoteForm.reset();
-    renderAll();
   });
 
   elements.techNoteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-
-    const created = await apiRequest("/tech-notes", {
-      method: "POST",
-      body: {
-        title: document.querySelector("#techTitle").value.trim(),
-        tag: document.querySelector("#techTag").value.trim(),
-        date: document.querySelector("#techDate").value,
-        content: document.querySelector("#techContent").value.trim(),
-      },
+    await addDoc(collection(db, "users", state.user.uid, "techNotes"), {
+      title: document.querySelector("#techTitle").value.trim(),
+      tag: document.querySelector("#techTag").value.trim(),
+      date: document.querySelector("#techDate").value,
+      content: document.querySelector("#techContent").value.trim(),
+      createdAtMs: Date.now(),
     });
-
-    state.techNotes.unshift(created.entry);
     elements.techNoteForm.reset();
-    renderAll();
   });
 
   elements.dailyWorkForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-
-    const formData = new FormData();
-    formData.append("date", document.querySelector("#workDate").value);
-    formData.append("title", document.querySelector("#workTitle").value.trim());
-    formData.append("focus", document.querySelector("#workFocus").value.trim());
-    formData.append("summary", document.querySelector("#workSummary").value.trim());
-
-    Array.from(elements.workFiles.files || []).forEach((file) => {
-      formData.append("workFiles", file);
+    await addDoc(collection(db, "users", state.user.uid, "dailyWork"), {
+      date: document.querySelector("#workDate").value,
+      title: document.querySelector("#workTitle").value.trim(),
+      focus: document.querySelector("#workFocus").value.trim(),
+      summary: document.querySelector("#workSummary").value.trim(),
+      createdAtMs: Date.now(),
     });
 
-    const created = await apiRequest("/daily-work", {
-      method: "POST",
-      formData,
-    });
-
-    state.dailyWork.unshift(created.entry);
     elements.dailyWorkForm.reset();
-    renderAll();
   });
+}
+
+async function ensureUserDocument(user, overrideName = "") {
+  const userDocRef = doc(db, "users", user.uid);
+  const snapshot = await getDoc(userDocRef);
+  if (snapshot.exists()) return;
+
+  await setDoc(userDocRef, {
+    name: overrideName || user.displayName || "",
+    email: user.email || "",
+    ...defaultState.profile,
+    createdAtMs: Date.now(),
+    updatedAtMs: Date.now(),
+  });
+}
+
+function subscribeToUserData(uid) {
+  unsubscribers.push(
+    onSnapshot(doc(db, "users", uid), (snapshot) => {
+      const data = snapshot.data() || {};
+      state.profile = {
+        studentName: data.studentName || "",
+        collegeName: data.collegeName || "",
+        branchName: data.branchName || "",
+        semesterName: data.semesterName || "2nd Semester",
+        sectionName: data.sectionName || "",
+        goalName: data.goalName || "",
+      };
+      state.user.name = data.name || state.user.name || "";
+      renderAll();
+    }),
+  );
+
+  unsubscribers.push(
+    onSnapshot(query(collection(db, "users", uid, "timetable"), orderBy("createdAtMs", "desc")), (snapshot) => {
+      state.timetable = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+      renderAll();
+    }),
+  );
+
+  unsubscribers.push(
+    onSnapshot(query(collection(db, "users", uid, "classNotes"), orderBy("createdAtMs", "desc")), (snapshot) => {
+      state.classNotes = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+      renderAll();
+    }),
+  );
+
+  unsubscribers.push(
+    onSnapshot(query(collection(db, "users", uid, "techNotes"), orderBy("createdAtMs", "desc")), (snapshot) => {
+      state.techNotes = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+      renderAll();
+    }),
+  );
+
+  unsubscribers.push(
+    onSnapshot(query(collection(db, "users", uid, "dailyWork"), orderBy("createdAtMs", "desc")), (snapshot) => {
+      state.dailyWork = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+      renderAll();
+    }),
+  );
+}
+
+function cleanupSubscriptions() {
+  unsubscribers.forEach((unsubscribe) => unsubscribe());
+  unsubscribers = [];
+}
+
+async function uploadDailyFiles(recordId, files) {
+  // File upload disabled due to Storage limitations
+  return [];
 }
 
 function switchAuthMode(mode) {
@@ -275,33 +342,6 @@ function showApp() {
   renderAll();
 }
 
-function setAuth(token) {
-  authToken = token;
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-function clearAuth() {
-  authToken = "";
-  localStorage.removeItem(TOKEN_KEY);
-  state = structuredClone(defaultState);
-}
-
-async function loadBootstrap() {
-  const data = await apiRequest("/bootstrap");
-  state = {
-    user: data.user,
-    profile: {
-      ...structuredClone(defaultState.profile),
-      ...(data.profile || {}),
-    },
-    timetable: data.timetable || [],
-    classNotes: data.classNotes || [],
-    techNotes: data.techNotes || [],
-    dailyWork: data.dailyWork || [],
-  };
-  renderAll();
-}
-
 function renderAll() {
   renderProfile();
   renderTimetable();
@@ -313,11 +353,9 @@ function renderAll() {
 
 function renderProfile() {
   const profile = state.profile || defaultState.profile;
-
   elements.loggedInAs.textContent = state.user
-    ? `${state.user.name} • ${state.user.email}`
+    ? `${state.user.name || "Student"} • ${state.user.email || ""}`
     : "";
-
   elements.studentName.value = profile.studentName || "";
   elements.collegeName.value = profile.collegeName || "";
   elements.branchName.value = profile.branchName || "";
@@ -353,7 +391,7 @@ function renderTimetable() {
     )
     .join("");
 
-  bindDeleteButtons("timetable", "/timetable");
+  bindDeleteButtons("timetable", "timetable");
 }
 
 function renderClassNotes() {
@@ -375,7 +413,7 @@ function renderClassNotes() {
     )
     .join("");
 
-  bindDeleteButtons("classNotes", "/class-notes");
+  bindDeleteButtons("classNotes", "classNotes");
 }
 
 function renderTechNotes() {
@@ -400,7 +438,7 @@ function renderTechNotes() {
     )
     .join("");
 
-  bindDeleteButtons("techNotes", "/tech-notes");
+  bindDeleteButtons("techNotes", "techNotes");
 }
 
 function renderDailyWork() {
@@ -416,71 +454,34 @@ function renderDailyWork() {
           <strong>${escapeHtml(record.title)}</strong>
           <p class="entry-meta">${formatDate(record.date)}${record.focus ? ` • ${escapeHtml(record.focus)}` : ""}</p>
           <p>${escapeHtml(record.summary)}</p>
-          <div class="file-list">
-            ${(record.files || [])
-              .map(
-                (file) => `
-                  <button type="button" class="file-pill" data-file-id="${file.id}">
-                    ${escapeHtml(file.originalName)}
-                  </button>
-                `,
-              )
-              .join("")}
-          </div>
           ${deleteMarkup("dailyWork", record.id)}
         </article>
       `,
     )
     .join("");
 
-  bindDeleteButtons("dailyWork", "/daily-work");
-  bindDownloadButtons();
+  bindDeleteButtons("dailyWork", "dailyWork");
 }
 
 function renderStats() {
   const uniqueSubjects = new Set(state.timetable.map((entry) => entry.subject.trim()).filter(Boolean));
   const totalFiles = state.dailyWork.reduce((count, record) => count + (record.files?.length || 0), 0);
-
   elements.subjectCount.textContent = String(uniqueSubjects.size);
   elements.noteCount.textContent = String(state.classNotes.length + state.techNotes.length);
   elements.fileCount.textContent = String(totalFiles);
 }
 
-function bindDeleteButtons(group, endpoint) {
+function bindDeleteButtons(group, collectionName) {
   document.querySelectorAll(`[data-delete-group="${group}"]`).forEach((button) => {
     button.addEventListener("click", async () => {
       const id = button.dataset.deleteId;
-      await apiRequest(`${endpoint}/${id}`, { method: "DELETE" });
-      state[group] = state[group].filter((item) => String(item.id) !== String(id));
-      renderAll();
-    });
-  });
-}
-
-function bindDownloadButtons() {
-  document.querySelectorAll("[data-file-id]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const response = await fetch(`${API_BASE}/files/${button.dataset.fileId}/download`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        alert("Could not download this file.");
-        return;
+      if (collectionName === "dailyWork") {
+        const record = state.dailyWork.find((item) => item.id === id);
+        for (const file of record?.files || []) {
+          await deleteObject(ref(storage, file.path));
+        }
       }
-
-      const blob = await response.blob();
-      const disposition = response.headers.get("Content-Disposition") || "";
-      const match = disposition.match(/filename="(.+)"/);
-      const fileName = match ? match[1] : "download";
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      link.click();
-      URL.revokeObjectURL(url);
+      await deleteDoc(doc(db, "users", state.user.uid, collectionName, id));
     });
   });
 }
@@ -529,37 +530,14 @@ function escapeHtml(value = "") {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;")
-    .replaceAll("\n", "<br>");
+    .replaceAll("'", "&#39;");
 }
 
-async function apiRequest(path, options = {}) {
-  const config = {
-    method: options.method || "GET",
-    headers: {},
-  };
-
-  if (authToken) {
-    config.headers.Authorization = `Bearer ${authToken}`;
-  }
-
-  if (options.formData) {
-    config.body = options.formData;
-  } else if (options.body) {
-    config.headers["Content-Type"] = "application/json";
-    config.body = JSON.stringify(options.body);
-  }
-
-  const response = await fetch(`${API_BASE}${path}`, config);
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuth();
-      showAuth();
-    }
-    throw new Error(data.error || "Something went wrong.");
-  }
-
-  return data;
+function readableError(error) {
+  const code = error?.code || "";
+  if (code.includes("auth/invalid-credential")) return "Invalid email or password.";
+  if (code.includes("auth/email-already-in-use")) return "This email is already registered.";
+  if (code.includes("auth/weak-password")) return "Choose a stronger password.";
+  if (code.includes("auth/network-request-failed")) return "Network error. Check your internet connection.";
+  return error?.message || "Something went wrong.";
 }

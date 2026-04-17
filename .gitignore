@@ -1,3 +1,6 @@
 storage/
 __pycache__/
 *.pyc
+firebase-debug.log
+public/
+.firebase/
