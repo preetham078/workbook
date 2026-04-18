@@ -1,4 +1,4 @@
-import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
+import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js?v=auth-fix-20260418";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
 import {
   createUserWithEmailAndPassword,
