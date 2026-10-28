@@ -2,6 +2,8 @@
 
 A static student organizer built for `GitHub Pages + Firebase`.
 
+live here : https://preetham078.github.io/workbook/
+
 It includes:
 
 - Firebase Authentication with email/password login
