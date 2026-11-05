@@ -42,9 +42,6 @@ To publish:
 3. Set `Source` to `GitHub Actions`
 4. Wait for the Pages workflow to finish
 
-Your site URL should be:
-
-- `https://preetham078.github.io/workbook/`
 
 ## Notes
 
